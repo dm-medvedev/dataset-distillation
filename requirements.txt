@@ -6,3 +6,4 @@ matplotlib
 torchvision >= 0.2.1
 pyyaml
 pillow
+pickle

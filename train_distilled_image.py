@@ -5,6 +5,7 @@ import numpy as np
 import torch
 import torch.nn.functional as F
 import torch.optim as optim
+from tqdm import tqdm
 
 from basics import task_loss, final_objective_loss, evaluate_steps
 from utils.distributed import broadcast_coalesced, all_reduce_coalesced
@@ -43,7 +44,7 @@ class Trainer(object):
         # data
         self.data = []
         for _ in range(self.num_data_steps):
-            distill_data = torch.randn(self.num_per_step, state.nc, state.input_size, state.input_size,
+            distill_data = torch.randn(self.num_per_step, state.input_size,
                                        device=state.device, requires_grad=True)
             self.data.append(distill_data)
             self.params.append(distill_data)
@@ -72,7 +73,6 @@ class Trainer(object):
     def get_steps(self):
         data_label_iterable = (x for _ in range(self.state.distill_epochs) for x in zip(self.data, self.labels))
         lrs = F.softplus(self.raw_distill_lrs).unbind()
-
         steps = []
         for (data, label), lr in zip(data_label_iterable, lrs):
             steps.append((data, label, lr))
@@ -92,7 +92,7 @@ class Trainer(object):
             with torch.enable_grad():
                 output = model.forward_with_param(data, w)
                 loss = task_loss(state, output, label)
-            gw, = torch.autograd.grad(loss, w, lr.squeeze(), create_graph=True)
+            gw, = torch.autograd.grad(loss, w, lr, create_graph=True)
 
             with torch.no_grad():
                 new_w = w.sub(gw).requires_grad_()
@@ -175,7 +175,7 @@ class Trainer(object):
             for d, g in zip(datas, gdatas):
                 d.grad.add_(g)
         if len(bwd_out) > 0:
-            torch.autograd.backward(bwd_out, bwd_grad)
+            torch.autograd.backward(bwd_out, bwd_grad) # because of SoftMax
 
     def save_results(self, steps=None, visualize=True, subfolder=''):
         with torch.no_grad():
@@ -199,37 +199,39 @@ class Trainer(object):
                 yield epoch, it, val
 
     def train(self):
+        MY_LOSSES = []
         state = self.state
         device = state.device
         train_loader = state.train_loader
-        sample_n_nets = state.local_sample_n_nets
-        grad_divisor = state.sample_n_nets  # i.e., global sample_n_nets
+        # sample_n_nets = state.local_sample_n_nets
+        # grad_divisor = state.sample_n_nets  # i.e., global sample_n_nets
         ckpt_int = state.checkpoint_interval
 
         data_t0 = time.time()
 
-        for epoch, it, (rdata, rlabel) in self.prefetch_train_loader_iter():
+        for epoch, it, (rdata, rlabel) in tqdm(self.prefetch_train_loader_iter(), desc = 'Training'):
             data_t = time.time() - data_t0
 
             if it == 0:
                 self.scheduler.step()
 
-            if it == 0 and ((ckpt_int >= 0 and epoch % ckpt_int == 0) or epoch == 0):
-                with torch.no_grad():
-                    steps = self.get_steps()
-                self.save_results(steps=steps, subfolder='checkpoints/epoch{:04d}'.format(epoch))
-                evaluate_steps(state, steps, 'Begin of epoch {}'.format(epoch))
+            # if it == 0 and ((ckpt_int >= 0 and epoch % ckpt_int == 0) or epoch == 0):
+            #     with torch.no_grad():
+            #         steps = self.get_steps()
+            #     self.save_results(steps=steps, subfolder='checkpoints/epoch{:04d}'.format(epoch))
+            #     evaluate_steps(state, steps, 'Begin of epoch {}'.format(epoch))
 
             do_log_this_iter = it == 0 or (state.log_interval >= 0 and it % state.log_interval == 0)
 
             self.optimizer.zero_grad()
             rdata, rlabel = rdata.to(device, non_blocking=True), rlabel.to(device, non_blocking=True)
 
-            if sample_n_nets == state.local_n_nets:
-                tmodels = self.models
-            else:
-                idxs = np.random.choice(state.local_n_nets, sample_n_nets, replace=False)
-                tmodels = [self.models[i] for i in idxs]
+            # if sample_n_nets == state.local_n_nets:
+            tmodels = self.models
+            grad_divisor = len(self.models)
+            # else:
+            #     idxs = np.random.choice(state.local_n_nets, sample_n_nets, replace=False)
+            #     tmodels = [self.models[i] for i in idxs]
 
             t0 = time.time()
             losses = []
@@ -254,15 +256,29 @@ class Trainer(object):
                 losses = torch.stack(losses, 0).sum()
                 all_reduce_tensors.append(losses)
 
-            if state.distributed:
-                all_reduce_coalesced(all_reduce_tensors, grad_divisor)
-            else:
-                for t in all_reduce_tensors:
-                    t.div_(grad_divisor)
+            # if state.distributed:
+            #     all_reduce_coalesced(all_reduce_tensors, grad_divisor)
+            # else:
+            for t in all_reduce_tensors:
+                t.div_(grad_divisor)
 
             # opt step
             self.optimizer.step()
             t = time.time() - t0
+
+            # print(type(losses))
+            # if isinstance(losses, list):
+            #     loss = torch.stack(losses, 0).sum().item()
+            # else:
+            #     loss = losses.item()
+
+            # print((
+            #     'Epoch: {:4d} [{:7d}/{:7d} ({:2.0f}%)]\tLoss: {:.4f}\t'
+            #     'Data Time: {:.2f}s\tTrain Time: {:.2f}s'
+            # ).format(
+            #     epoch, it * train_loader.batch_size, len(train_loader.dataset),
+            #     100. * it / len(train_loader), loss, data_t, t,
+            # ))
 
             if do_log_this_iter:
                 loss = losses.item()
@@ -276,6 +292,8 @@ class Trainer(object):
                 if loss != loss:  # nan
                     raise RuntimeError('loss became NaN')
 
+            MY_LOSSES.append(torch.stack(losses, 0).sum().item() if isinstance(losses, list)\
+                             else losses.item()) # torch.stack(losses, 0).sum().item()
             del steps, grad_infos, losses, all_reduce_tensors
 
             data_t0 = time.time()
@@ -283,7 +301,7 @@ class Trainer(object):
         with torch.no_grad():
             steps = self.get_steps()
         self.save_results(steps)
-        return steps
+        return steps, MY_LOSSES
 
 
 def distill(state, models):

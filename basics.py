@@ -1,6 +1,7 @@
 import logging
 import math
 import os
+import pickle as pk
 
 import numpy as np
 import torch
@@ -72,7 +73,7 @@ def train_steps_inplace(state, models, steps, params=None, callback=None):
             model.train()  # callback may change model.training so we set here
             output = model.forward_with_param(data, w)
             loss = task_loss(state, output, label)
-            loss.backward(lr.squeeze())
+            loss.backward(lr)
             with torch.no_grad():
                 w.sub_(w.grad)
                 w.grad = None
@@ -130,7 +131,7 @@ def evaluate_models(state, models, param_list=None, test_all=False, test_loader_
                     output = model.forward_with_param(data, param_list[k])
 
                 if num_classes == 2:
-                    pred = (output > 0.5).to(target.dtype).view(-1)
+                    pred = (torch.sigmoid(output) > 0.5).to(target.dtype).view(-1)
                 else:
                     pred = output.argmax(1)  # get the index of the max log-probability
 
@@ -219,7 +220,7 @@ def infinite_iterator(iterable):
         yield from iter(iterable)
 
 
-# See NOTE [ Evaluation Result Format ] for output format
+# See NOTE [ Evaluation Result Format ] for output format + params
 def evaluate_steps(state, steps, prefix, details='', test_all=False, test_at_steps=None, log_results=True):
     models = state.test_models
     n_steps = len(steps)
@@ -254,6 +255,7 @@ def evaluate_steps(state, steps, prefix, details='', test_all=False, test_at_ste
         accs = []      # STEP x MODEL (x CLASSES)
         totals = []    # STEP x MODEL (x CLASSES)
         losses = []    # STEP x MODEL
+        model_params = []
 
         if reset:
             params = [m.reset(state, inplace=False) for m in models]
@@ -274,13 +276,14 @@ def evaluate_steps(state, steps, prefix, details='', test_all=False, test_at_ste
                 pbar.update()
 
         params = train_steps_inplace(state, models, steps, params, callback=test_callback)
+        model_params = params
         if log_results:
             pbar.close()
 
         at_steps = torch.as_tensor(at_steps, device=state.device)  # STEP
         accs = torch.as_tensor(accs, device=state.device)          # STEP x MODEL (x CLASS)
         losses = torch.as_tensor(losses, device=state.device)      # STEP x MODEL
-        return at_steps, accs, losses
+        return at_steps, accs, losses, model_params
 
     if log_results:
         logging.info('')
