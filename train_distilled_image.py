@@ -215,23 +215,13 @@ class Trainer(object):
             if it == 0:
                 self.scheduler.step()
 
-            # if it == 0 and ((ckpt_int >= 0 and epoch % ckpt_int == 0) or epoch == 0):
-            #     with torch.no_grad():
-            #         steps = self.get_steps()
-            #     self.save_results(steps=steps, subfolder='checkpoints/epoch{:04d}'.format(epoch))
-            #     evaluate_steps(state, steps, 'Begin of epoch {}'.format(epoch))
-
             do_log_this_iter = it == 0 or (state.log_interval >= 0 and it % state.log_interval == 0)
 
             self.optimizer.zero_grad()
             rdata, rlabel = rdata.to(device, non_blocking=True), rlabel.to(device, non_blocking=True)
 
-            # if sample_n_nets == state.local_n_nets:
             tmodels = self.models
             grad_divisor = len(self.models)
-            # else:
-            #     idxs = np.random.choice(state.local_n_nets, sample_n_nets, replace=False)
-            #     tmodels = [self.models[i] for i in idxs]
 
             t0 = time.time()
             losses = []
@@ -265,20 +255,6 @@ class Trainer(object):
             # opt step
             self.optimizer.step()
             t = time.time() - t0
-
-            # print(type(losses))
-            # if isinstance(losses, list):
-            #     loss = torch.stack(losses, 0).sum().item()
-            # else:
-            #     loss = losses.item()
-
-            # print((
-            #     'Epoch: {:4d} [{:7d}/{:7d} ({:2.0f}%)]\tLoss: {:.4f}\t'
-            #     'Data Time: {:.2f}s\tTrain Time: {:.2f}s'
-            # ).format(
-            #     epoch, it * train_loader.batch_size, len(train_loader.dataset),
-            #     100. * it / len(train_loader), loss, data_t, t,
-            # ))
 
             if do_log_this_iter:
                 loss = losses.item()

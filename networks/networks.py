@@ -3,16 +3,15 @@ import torch.nn.functional as F
 
 from . import utils
 
-# linear model
+
 class LinearNet(utils.ReparamModule):
     def __init__(self, state):
         super(LinearNet, self).__init__()
-        self.fc = nn.Linear(2, 1 if state.num_classes <= 2 else state.num_classes, bias=True)
+        self.fc = nn.Linear(2, 1 if state.num_classes <= 2
+                            else state.num_classes, bias=True)
         self.l2 = state.L2_coef
-#         self.fc2 = nn.Linear(20, )
 
     def forward(self, x):
-#         out = F.relu(self.fc1(x), inplace=True)
         out = self.fc(x)
         if self.training:
             for p in self.parameters():
@@ -21,11 +20,11 @@ class LinearNet(utils.ReparamModule):
 
 
 class NonLinearNet(utils.ReparamModule):
-    def __init__(self, state, mid_sz = 10):
-        # print(type(MyNonLinearNet), type(self))
+    def __init__(self, state, mid_sz=10):
         super(NonLinearNet, self).__init__()
         self.fc1 = nn.Linear(2, mid_sz)
-        self.fc2 = nn.Linear(mid_sz, 1 if state.num_classes <= 2 else state.num_classes)
+        self.fc2 = nn.Linear(mid_sz, 1 if state.num_classes <= 2
+                             else state.num_classes)
 
     def forward(self, x):
         out = F.relu(self.fc1(x), inplace=True)
@@ -34,13 +33,15 @@ class NonLinearNet(utils.ReparamModule):
 
 
 class MoreNonLinearNet(utils.ReparamModule):
-    def __init__(self, state, mid_sz = 10):
-        # print(type(MyNonLinearNet), type(self))
+    def __init__(self, state, mid_sz=10):
         super(MoreNonLinearNet, self).__init__()
         self.fc1 = nn.Linear(2, mid_sz)
-        self.fc2 = nn.Linear(mid_sz, mid_sz if state.num_classes <= 2 else state.num_classes)
-        self.fc3 = nn.Linear(mid_sz, mid_sz if state.num_classes <= 2 else state.num_classes)
-        self.fc4 = nn.Linear(mid_sz, 1 if state.num_classes <= 2 else state.num_classes)
+        self.fc2 = nn.Linear(mid_sz, mid_sz if state.num_classes <= 2
+                             else state.num_classes)
+        self.fc3 = nn.Linear(mid_sz, mid_sz if state.num_classes <= 2
+                             else state.num_classes)
+        self.fc4 = nn.Linear(mid_sz, 1 if state.num_classes <= 2
+                             else state.num_classes)
 
     def forward(self, x):
         out = F.relu(self.fc1(x), inplace=True)
