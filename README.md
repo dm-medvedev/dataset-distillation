@@ -1,5 +1,6 @@
 # Dataset Distillation
-The code was forked from the [project](https://github.com/SsnL/dataset-distillation) and changed by [Dmitry Medvedev](https://github.com/dm-medvedev).
+The code was forked from the [initial project](https://github.com/SsnL/dataset-distillation) and changed by [Dmitry Medvedev](https://github.com/dm-medvedev).  
+This project contains code of experiments for [courswork](https://github.com/dm-medvedev/dataset-distillation/blob/master/docs/presentation.pdf)
 
 ## Prerequisites
 
@@ -14,16 +15,3 @@ The code was forked from the [project](https://github.com/SsnL/dataset-distillat
 - ``matplotlib``
 - ``pyyaml``
 - ``tqdm``
-
-## Citation
-
-If you find this useful for your research, please cite the following paper.
-
-```
-@article{wang2018dataset,
-  title={Dataset Distillation},
-  author={Wang, Tongzhou and Zhu, Jun-Yan and Torralba, Antonio and Efros, Alexei A},
-  journal={arXiv preprint arXiv:1811.10959},
-  year={2018}
-}
-```
