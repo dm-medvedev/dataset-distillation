@@ -1,3 +1,4 @@
+import argparse
 import glob
 import logging
 import os
@@ -127,16 +128,24 @@ def visualise(exp_dir):
     pbar.close()
 
 
-def main():
-    torch.manual_seed(42)
-    np.random.seed(42)
-    exp_dirnm = 'experiment_whole_data'
-    os.makedirs(RES_FOLDER, exist_ok=True)
-    exp_dir = os.path.join(RES_FOLDER, exp_dirnm)
-    os.mkdir(exp_dir)
-    train_on_the_whole_data(exp_dir)
+def main(args):
+    if args.results_dir is None:
+        torch.manual_seed(42)
+        np.random.seed(42)
+        exp_dirnm = 'experiment_whole_data'
+        os.makedirs(RES_FOLDER, exist_ok=True)
+        exp_dir = os.path.join(RES_FOLDER, exp_dirnm)
+        os.mkdir(exp_dir)
+        train_on_the_whole_data(exp_dir)
+    else:
+        exp_dir = args.results_dir
     visualise(exp_dir)
 
 
 if __name__ == '__main__':
-    main()
+    parser = argparse.ArgumentParser(description='get results for usual'
+                                     'training with the whole data.')
+    parser.add_argument('--results_dir', default=None, help='provide existing'
+                        'path to the results to get visualisation.')
+    args = parser.parse_args()
+    main(args)
