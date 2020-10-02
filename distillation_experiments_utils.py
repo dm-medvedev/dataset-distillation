@@ -18,7 +18,7 @@ from visualisation import GLOB_TITLES, plot_convergence,\
 
 
 ResEl = namedtuple('ResEl', ['state', 'steps', 'losses', 'time'])
-TOTAL_RESTARTS = 2
+TOTAL_RESTARTS = 10
 DISTILL_EPOCHS = 5
 DISTILL_STEPS = 40
 EPOCHS = 50
