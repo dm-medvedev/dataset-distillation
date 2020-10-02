@@ -8,6 +8,8 @@ Download the data from [google drive](https://drive.google.com/file/d/1zvu7ywHsa
 ``python experiment_general_distillation.py --results_dir ./Results/experiment_general_distillation``  
 ``python experiment_strategies.py``  
 
+**Note:** if you cannot find any experiments, it is because the code is under refactoring and all experiments will be added soon.
+
 ## Prerequisites
 
 ### System requirements
