@@ -72,10 +72,11 @@ def train_steps_inplace(state, models, steps, params=None, callback=None):
         for model, w in zip(models, params):
             model.train()  # callback may change model.training so we set here
             output = model.forward_with_param(data, w)
+            # breakpoint()
             loss = task_loss(state, output, label)
-            loss.backward(lr)
+            loss.backward()
             with torch.no_grad():
-                w.sub_(w.grad)
+                w.sub_(lr*w.grad)
                 w.grad = None
 
     if callback is not None:
@@ -134,7 +135,6 @@ def evaluate_models(state, models, param_list=None, test_all=False, test_loader_
                     pred = (torch.sigmoid(output) > 0.5).to(target.dtype).view(-1)
                 else:
                     pred = output.argmax(1)  # get the index of the max log-probability
-
                 correct_list = pred == target
                 losses[k] += task_loss(state, output, target, reduction='sum').item()  # sum up batch loss
                 if attack_mode:
@@ -265,7 +265,6 @@ def evaluate_steps(state, steps, prefix, details='', test_all=False, test_at_ste
         def test_callback(at_step, params):
             if at_step not in test_at_steps:  # not test_all and
                 return
-
             acc, loss = evaluate_models(state, models, params, test_all=test_all,
                                         test_loader_iter=test_loader_iter)
 
@@ -274,7 +273,6 @@ def evaluate_steps(state, steps, prefix, details='', test_all=False, test_at_ste
             losses.append(loss)
             if log_results:
                 pbar.update()
-
         params = train_steps_inplace(state, models, steps, params, callback=test_callback)
         model_params = params
         if log_results:
